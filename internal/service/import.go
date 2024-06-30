@@ -126,8 +126,8 @@ func (i *ImportService) ProcessData(data string) error {
 	return nil
 }
 
-func (i *ImportService) RenameGzFile(originalPath, newExtension string) error {
-	newFilePath := strings.TrimSuffix(originalPath, ".gz") + newExtension
+func (i *ImportService) RenameGZFile(originalPath, oldExtension string, newExtension string) error {
+	newFilePath := strings.TrimSuffix(originalPath, oldExtension) + newExtension
 	err := os.Rename(originalPath, newFilePath)
 	if err != nil {
 		return err

@@ -49,7 +49,7 @@ func main() {
 		}
 
 		fmt.Println("Renaming file...")
-		err = importService.RenameGzFile(file, ".done")
+		err = importService.RenameGZFile(file, ".gz", ".done")
 		if err != nil {
 			log.Fatal(err)
 		}
