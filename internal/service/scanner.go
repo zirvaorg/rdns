@@ -1,7 +1,7 @@
 package service
 
 import (
-	"log"
+	"fmt"
 	"os"
 	"rdns/internal/durable"
 	"rdns/internal/model"
@@ -66,13 +66,13 @@ func (s *ScannerService) batchInsertWhoIs(whoisRecords []model.WhoIs) {
 
 	for _, record := range whoisRecords {
 		if err := tx.Create(&record).Error; err != nil {
-			log.Println("Error creating whois:", err)
-			tx.Rollback()
-			return
+			if !strings.Contains(err.Error(), "UNIQUE constraint failed") {
+				fmt.Println("Error creating whois record:", err)
+			}
 		}
 	}
 
 	if err := tx.Commit().Error; err != nil {
-		log.Println("Error committing whois:", err)
+		return
 	}
 }
