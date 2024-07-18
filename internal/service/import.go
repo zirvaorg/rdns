@@ -2,7 +2,6 @@ package service
 
 import (
 	"compress/gzip"
-	"github.com/cheggaaa/pb"
 	"io"
 	"log"
 	"os"
@@ -57,11 +56,7 @@ func (i *ImportService) ProcessData(data string) error {
 		maxRoutines, _ = strconv.Atoi(os.Getenv("MAX_ROUTINES"))
 		lines          = strings.Split(data, "\n")
 		domains        = make([]model.Domain, 0, len(lines))
-
-		bar = pb.StartNew(len(lines))
 	)
-	bar.ShowElapsedTime = true
-	bar.ShowSpeed = true
 
 	for _, line := range lines {
 		fields := strings.Fields(line)
@@ -110,7 +105,6 @@ func (i *ImportService) ProcessData(data string) error {
 						log.Println("Error creating domain:", err)
 					}
 				}
-				bar.Increment()
 				mu.Unlock()
 			}
 		}(batch)
@@ -120,8 +114,6 @@ func (i *ImportService) ProcessData(data string) error {
 	if err := tx.Commit().Error; err != nil {
 		return err
 	}
-
-	bar.Finish()
 
 	return nil
 }
