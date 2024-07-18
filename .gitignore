@@ -1,5 +1,8 @@
 .rclone.conf
 .env
+*.db
+*.db-*
+assets/list/*
 
 .idea/**/workspace.xml
 .idea/**/tasks.xml
