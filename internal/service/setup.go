@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"log"
 	"path/filepath"
 	"rdns/internal/durable"
@@ -32,6 +33,8 @@ func (s *Setup) ScannerService() {
 
 		scannerService.WhoIs(domains, dbFile)
 	}
+
+	fmt.Println("ScannerService done one step")
 }
 
 func (s *Setup) ImportService() {

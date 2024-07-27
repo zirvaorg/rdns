@@ -5,6 +5,7 @@ import (
 	"log"
 	"rdns/internal/service"
 	"sync"
+	"time"
 )
 
 func init() {
@@ -21,14 +22,19 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		services.ImportService()
+		for {
+			services.ImportService()
+			time.Sleep(1 * time.Minute)
+		}
 	}()
 
 	// Scanner service
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		services.ScannerService()
+		for {
+			services.ScannerService()
+		}
 	}()
 
 	wg.Wait()
