@@ -2,6 +2,8 @@ package service
 
 import (
 	"fmt"
+	"gorm.io/gorm"
+	"log"
 	"os"
 	"rdns/internal/durable"
 	"rdns/internal/model"
@@ -32,7 +34,27 @@ func (s *ScannerService) getWhoIsInfo(tld, domain string) string {
 	return strings.Join(filteredLines, "\n")
 }
 
-func (s *ScannerService) WhoIs(domains []model.Domain) {
+func (s *ScannerService) CreateTableIfNotExist(dbName string) (*gorm.DB, error) {
+	db, err := durable.ConnectDB(dbName)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := os.Stat(dbName); os.IsNotExist(err) || !db.Migrator().HasTable(&model.WhoIs{}) {
+		if err := db.AutoMigrate(&model.WhoIs{}); err != nil {
+			return nil, err
+		}
+	}
+
+	return db, nil
+}
+
+func (s *ScannerService) WhoIs(domains []model.Domain, dbName string) {
+	db, err := s.CreateTableIfNotExist(dbName)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	var whoisRecords []model.WhoIs
 	batchSize, _ := strconv.Atoi(os.Getenv("BATCH_SIZE"))
 
@@ -51,18 +73,18 @@ func (s *ScannerService) WhoIs(domains []model.Domain) {
 		whoisRecords = append(whoisRecords, newWhoIs)
 
 		if len(whoisRecords) >= batchSize {
-			s.batchInsertWhoIs(whoisRecords)
+			s.batchInsertWhoIs(db, whoisRecords)
 			whoisRecords = []model.WhoIs{}
 		}
 	}
 
 	if len(whoisRecords) > 0 {
-		s.batchInsertWhoIs(whoisRecords)
+		s.batchInsertWhoIs(db, whoisRecords)
 	}
 }
 
-func (s *ScannerService) batchInsertWhoIs(whoisRecords []model.WhoIs) {
-	tx := durable.Connection().Begin()
+func (s *ScannerService) batchInsertWhoIs(db *gorm.DB, whoisRecords []model.WhoIs) {
+	tx := db.Begin()
 
 	for _, record := range whoisRecords {
 		if err := tx.Create(&record).Error; err != nil {

@@ -2,6 +2,7 @@ package service
 
 import (
 	"compress/gzip"
+	"gorm.io/gorm"
 	"io"
 	"log"
 	"os"
@@ -14,6 +15,20 @@ import (
 )
 
 type ImportService struct{}
+
+func (i *ImportService) CreateDBIfNotExists(dbName string) (*gorm.DB, error) {
+	if _, err := os.Stat(dbName); os.IsNotExist(err) {
+		db, err := durable.ConnectDB(dbName)
+		if err != nil {
+			return nil, err
+		}
+		if err := db.AutoMigrate(&model.Domain{}); err != nil {
+			return nil, err
+		}
+		return db, nil
+	}
+	return durable.ConnectDB(dbName)
+}
 
 func (i *ImportService) ReadGZFiles(dir string, suffix string) ([]string, error) {
 	var files []string
@@ -50,7 +65,12 @@ func (i *ImportService) ExtractAndReadGZ(file string) (string, error) {
 	return string(content), nil
 }
 
-func (i *ImportService) ProcessData(data string) error {
+func (i *ImportService) ProcessData(data string, dbName string) error {
+	db, err := i.CreateDBIfNotExists(dbName)
+	if err != nil {
+		return err
+	}
+
 	var (
 		batchSize, _   = strconv.Atoi(os.Getenv("BATCH_SIZE"))
 		maxRoutines, _ = strconv.Atoi(os.Getenv("MAX_ROUTINES"))
@@ -76,7 +96,7 @@ func (i *ImportService) ProcessData(data string) error {
 	}
 
 	var (
-		tx        = durable.Connection().Begin()
+		tx        = db.Begin()
 		wg        sync.WaitGroup
 		mu        sync.Mutex
 		semaphore = make(chan struct{}, maxRoutines)
