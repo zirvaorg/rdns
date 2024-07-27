@@ -28,13 +28,13 @@ func (s *Setup) ScannerService() {
 		var domains []model.Domain
 		result := db.Find(&domains)
 		if result.Error != nil {
-			log.Fatal("Error fetching domains from", dbFile, ":", result.Error)
+			log.Println("Error fetching domains from", dbFile, ":", result.Error)
 		}
 
 		scannerService.WhoIs(domains, dbFile)
+		fmt.Println("ScannerService done one step")
 	}
 
-	fmt.Println("ScannerService done one step")
 }
 
 func (s *Setup) ImportService() {

@@ -3,7 +3,6 @@ package service
 import (
 	"fmt"
 	"gorm.io/gorm"
-	"log"
 	"os"
 	"rdns/internal/durable"
 	"rdns/internal/model"
@@ -52,7 +51,7 @@ func (s *ScannerService) CreateTableIfNotExist(dbName string) (*gorm.DB, error) 
 func (s *ScannerService) WhoIs(domains []model.Domain, dbName string) {
 	db, err := s.CreateTableIfNotExist(dbName)
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 
 	var whoisRecords []model.WhoIs

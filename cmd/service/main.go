@@ -22,10 +22,8 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for {
-			services.ImportService()
-			time.Sleep(1 * time.Minute)
-		}
+		services.ImportService()
+		time.Sleep(30 * time.Second)
 	}()
 
 	// Scanner service
@@ -34,6 +32,7 @@ func main() {
 		defer wg.Done()
 		for {
 			services.ScannerService()
+			time.Sleep(30 * time.Second)
 		}
 	}()
 
