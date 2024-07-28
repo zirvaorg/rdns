@@ -1,7 +1,6 @@
 package service
 
 import (
-	"bufio"
 	"compress/gzip"
 	"gorm.io/gorm"
 	"io"
@@ -57,47 +56,27 @@ func (i *ImportService) ExtractAndReadGZ(file string) (string, error) {
 	}
 	defer gr.Close()
 
-	var builder strings.Builder
-	buf := make([]byte, 4096) // 4KB buffer
-	for {
-		n, err := gr.Read(buf)
-		if err != nil && err != io.EOF {
-			return "", err
-		}
-		if n == 0 {
-			break
-		}
-		builder.Write(buf[:n])
+	content, err := io.ReadAll(gr)
+	if err != nil {
+		return "", err
 	}
 
-	return builder.String(), nil
+	return string(content), nil
 }
 
-func (i *ImportService) ProcessData(filePath string, dbName string) error {
+func (i *ImportService) ProcessData(data string, dbName string) error {
 	db, err := i.createDBIfNotExists(dbName)
 	if err != nil {
 		return err
 	}
 
-	batchSize, _ := strconv.Atoi(os.Getenv("BATCH_SIZE"))
+	var (
+		batchSize, _ = strconv.Atoi(os.Getenv("BATCH_SIZE"))
+		lines        = strings.Split(data, "\n")
+		domains      = make([]model.Domain, 0, len(lines))
+	)
 
-	file, err := os.Open(filePath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	tx := db.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
-
-	var domains []model.Domain
-	for scanner.Scan() {
-		line := scanner.Text()
+	for _, line := range lines {
 		fields := strings.Fields(line)
 		if len(fields) == 0 {
 			continue
@@ -112,20 +91,23 @@ func (i *ImportService) ProcessData(filePath string, dbName string) error {
 			Name: domainParts[0],
 			TLD:  domainParts[1],
 		})
-
-		if len(domains) >= batchSize {
-			if err := i.saveBatch(tx, domains); err != nil {
-				tx.Rollback()
-				return err
-			}
-			domains = domains[:0] // Clear the slice
-		}
 	}
 
-	if len(domains) > 0 {
-		if err := i.saveBatch(tx, domains); err != nil {
-			tx.Rollback()
-			return err
+	tx := db.Begin()
+
+	for start := 0; start < len(domains); start += batchSize {
+		end := start + batchSize
+		if end > len(domains) {
+			end = len(domains)
+		}
+		batch := domains[start:end]
+
+		for _, domain := range batch {
+			if err := tx.Create(&domain).Error; err != nil {
+				if !strings.Contains(err.Error(), "UNIQUE constraint failed") {
+					log.Println("Error creating domain:", err)
+				}
+			}
 		}
 	}
 
@@ -133,18 +115,6 @@ func (i *ImportService) ProcessData(filePath string, dbName string) error {
 		return err
 	}
 
-	return scanner.Err()
-}
-
-func (i *ImportService) saveBatch(tx *gorm.DB, domains []model.Domain) error {
-	for _, domain := range domains {
-		if err := tx.Create(&domain).Error; err != nil {
-			if !strings.Contains(err.Error(), "UNIQUE constraint failed") {
-				log.Println("Error creating domain:", err)
-				return err
-			}
-		}
-	}
 	return nil
 }
 
