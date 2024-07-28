@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/joho/godotenv"
 	"log"
 	"rdns/internal/service"
@@ -24,6 +25,7 @@ func main() {
 		defer wg.Done()
 		services.ImportService()
 		time.Sleep(30 * time.Second)
+		fmt.Println("Import service")
 	}()
 
 	// Scanner service
@@ -33,6 +35,7 @@ func main() {
 		for {
 			services.ScannerService()
 			time.Sleep(30 * time.Second)
+			fmt.Println("scanner service")
 		}
 	}()
 
