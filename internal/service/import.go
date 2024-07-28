@@ -73,8 +73,10 @@ func (i *ImportService) ProcessData(data string, dbName string) error {
 	var (
 		batchSize, _ = strconv.Atoi(os.Getenv("BATCH_SIZE"))
 		lines        = strings.Split(data, "\n")
-		domains      = make([]model.Domain, 0, len(lines))
+		domains      = make([]model.Domain, 0, batchSize)
 	)
+
+	tx := db.Begin()
 
 	for _, line := range lines {
 		fields := strings.Fields(line)
@@ -91,33 +93,36 @@ func (i *ImportService) ProcessData(data string, dbName string) error {
 			Name: domainParts[0],
 			TLD:  domainParts[1],
 		})
+
+		if len(domains) == batchSize {
+			if err := i.saveBatch(tx, domains); err != nil {
+				return err
+			}
+			domains = domains[:0]
+		}
 	}
 
-	tx := db.Begin()
-
-	for start := 0; start < len(domains); start += batchSize {
-		end := start + batchSize
-		if end > len(domains) {
-			end = len(domains)
+	if len(domains) > 0 {
+		if err := i.saveBatch(tx, domains); err != nil {
+			return err
 		}
-		batch := domains[start:end]
-
-		for _, domain := range batch {
-			if err := tx.Create(&domain).Error; err != nil {
-				if !strings.Contains(err.Error(), "UNIQUE constraint failed") {
-					log.Println("Error creating domain:", err)
-				}
-			}
-		}
-
-		// clear the batch to free up memory
-		batch = nil
 	}
 
 	if err := tx.Commit().Error; err != nil {
 		return err
 	}
 
+	return nil
+}
+
+func (i *ImportService) saveBatch(tx *gorm.DB, batch []model.Domain) error {
+	for _, domain := range batch {
+		if err := tx.Create(&domain).Error; err != nil {
+			if !strings.Contains(err.Error(), "UNIQUE constraint failed") {
+				log.Println("Error creating domain:", err)
+			}
+		}
+	}
 	return nil
 }
 
