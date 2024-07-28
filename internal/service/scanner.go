@@ -34,6 +34,11 @@ func (s *ScannerService) getWhoIsInfo(tld, domain string) string {
 }
 
 func (s *ScannerService) createTableIfNotExist(dbName string) (*gorm.DB, error) {
+	journalFileName := dbName + "-journal"
+	if _, err := os.Stat(journalFileName); err == nil {
+		return nil, fmt.Errorf("journal file %s exists, skipping database operation", journalFileName)
+	}
+
 	db, err := durable.ConnectDB(dbName)
 	if err != nil {
 		return nil, err
