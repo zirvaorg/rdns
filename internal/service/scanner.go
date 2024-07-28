@@ -33,21 +33,6 @@ func (s *ScannerService) getWhoIsInfo(tld, domain string) string {
 	return strings.Join(filteredLines, "\n")
 }
 
-func (s *ScannerService) createTableIfNotExist(dbName string) (*gorm.DB, error) {
-	db, err := durable.ConnectDB(dbName)
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err := os.Stat(dbName); os.IsNotExist(err) || !db.Migrator().HasTable(&model.WhoIs{}) {
-		if err := db.AutoMigrate(&model.WhoIs{}); err != nil {
-			return nil, err
-		}
-	}
-
-	return db, nil
-}
-
 func (s *ScannerService) batchInsertWhoIs(db *gorm.DB, whoisRecords []model.WhoIs) {
 	tx := db.Begin()
 
@@ -64,12 +49,7 @@ func (s *ScannerService) batchInsertWhoIs(db *gorm.DB, whoisRecords []model.WhoI
 	}
 }
 
-func (s *ScannerService) WhoIs(domains []model.Domain, dbName string) {
-	db, err := s.createTableIfNotExist(dbName)
-	if err != nil {
-		return
-	}
-
+func (s *ScannerService) WhoIs(domains []model.Domain, db *gorm.DB) {
 	var whoisRecords []model.WhoIs
 	batchSize, _ := strconv.Atoi(os.Getenv("BATCH_SIZE"))
 

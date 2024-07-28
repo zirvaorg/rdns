@@ -29,3 +29,13 @@ func ConnectDB(dbName string) (*gorm.DB, error) {
 
 	return db, nil
 }
+
+func CreateTableIfNotExist(db *gorm.DB, scheme interface{}) (bool, error) {
+	if !db.Migrator().HasTable(scheme) {
+		if err := db.AutoMigrate(scheme); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	return true, nil
+}

@@ -56,7 +56,19 @@ func (s *Setup) ScannerService() {
 
 		db, err := durable.ConnectDB(dbFile)
 		if err != nil {
-			log.Fatal("Error connecting to database:", err)
+			log.Printf("Error connecting to database %s: %v", dbFile, err)
+			continue
+		}
+
+		table, err := durable.CreateTableIfNotExist(db, &model.WhoIs{})
+		if err != nil {
+			log.Println("Error creating WhoIs table:", err)
+			continue
+		}
+
+		if !table {
+			log.Println("WhoIs table not created")
+			continue
 		}
 
 		var domains []model.Domain
@@ -65,7 +77,7 @@ func (s *Setup) ScannerService() {
 			log.Println("Error fetching domains from", dbFile, ":", result.Error)
 		}
 
-		scannerService.WhoIs(domains, dbFile)
+		scannerService.WhoIs(domains, db)
 		fmt.Println("ScannerService done one step")
 	}
 }
