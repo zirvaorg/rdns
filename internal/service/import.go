@@ -109,6 +109,9 @@ func (i *ImportService) ProcessData(data string, dbName string) error {
 				}
 			}
 		}
+
+		// clear the batch to free up memory
+		batch = nil
 	}
 
 	if err := tx.Commit().Error; err != nil {
