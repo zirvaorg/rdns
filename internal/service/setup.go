@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"rdns/internal/durable"
 	"rdns/internal/model"
@@ -47,6 +48,12 @@ func (s *Setup) ScannerService() {
 	}
 
 	for _, dbFile := range dbFiles {
+		journalFileName := dbFile + "-journal"
+		if _, err := os.Stat(journalFileName); err == nil {
+			log.Printf("Journal file %s exists, skipping database operation for %s", journalFileName, dbFile)
+			continue
+		}
+
 		db, err := durable.ConnectDB(dbFile)
 		if err != nil {
 			log.Fatal("Error connecting to database:", err)
@@ -61,5 +68,4 @@ func (s *Setup) ScannerService() {
 		scannerService.WhoIs(domains, dbFile)
 		fmt.Println("ScannerService done one step")
 	}
-
 }
