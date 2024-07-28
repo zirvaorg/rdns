@@ -56,12 +56,20 @@ func (i *ImportService) ExtractAndReadGZ(file string) (string, error) {
 	}
 	defer gr.Close()
 
-	content, err := io.ReadAll(gr)
-	if err != nil {
-		return "", err
+	var builder strings.Builder
+	buf := make([]byte, 4096) // 4KB buffer
+	for {
+		n, err := gr.Read(buf)
+		if err != nil && err != io.EOF {
+			return "", err
+		}
+		if n == 0 {
+			break
+		}
+		builder.Write(buf[:n])
 	}
 
-	return string(content), nil
+	return builder.String(), nil
 }
 
 func (i *ImportService) ProcessData(data string, dbName string) error {
