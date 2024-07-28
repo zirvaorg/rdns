@@ -11,12 +11,11 @@ import (
 	"rdns/internal/model"
 	"strconv"
 	"strings"
-	"sync"
 )
 
 type ImportService struct{}
 
-func (i *ImportService) CreateDBIfNotExists(dbName string) (*gorm.DB, error) {
+func (i *ImportService) createDBIfNotExists(dbName string) (*gorm.DB, error) {
 	if _, err := os.Stat(dbName); os.IsNotExist(err) {
 		db, err := durable.ConnectDB(dbName)
 		if err != nil {
@@ -66,16 +65,15 @@ func (i *ImportService) ExtractAndReadGZ(file string) (string, error) {
 }
 
 func (i *ImportService) ProcessData(data string, dbName string) error {
-	db, err := i.CreateDBIfNotExists(dbName)
+	db, err := i.createDBIfNotExists(dbName)
 	if err != nil {
 		return err
 	}
 
 	var (
-		batchSize, _   = strconv.Atoi(os.Getenv("BATCH_SIZE"))
-		maxRoutines, _ = strconv.Atoi(os.Getenv("MAX_ROUTINES"))
-		lines          = strings.Split(data, "\n")
-		domains        = make([]model.Domain, 0, len(lines))
+		batchSize, _ = strconv.Atoi(os.Getenv("BATCH_SIZE"))
+		lines        = strings.Split(data, "\n")
+		domains      = make([]model.Domain, 0, len(lines))
 	)
 
 	for _, line := range lines {
@@ -95,12 +93,7 @@ func (i *ImportService) ProcessData(data string, dbName string) error {
 		})
 	}
 
-	var (
-		tx        = db.Begin()
-		wg        sync.WaitGroup
-		mu        sync.Mutex
-		semaphore = make(chan struct{}, maxRoutines)
-	)
+	tx := db.Begin()
 
 	for start := 0; start < len(domains); start += batchSize {
 		end := start + batchSize
@@ -109,27 +102,14 @@ func (i *ImportService) ProcessData(data string, dbName string) error {
 		}
 		batch := domains[start:end]
 
-		wg.Add(1)
-		semaphore <- struct{}{}
-
-		go func(batch []model.Domain) {
-			defer wg.Done()
-			defer func() {
-				<-semaphore
-			}()
-
-			for _, domain := range batch {
-				mu.Lock()
-				if err := tx.Create(&domain).Error; err != nil {
-					if !strings.Contains(err.Error(), "UNIQUE constraint failed") {
-						log.Println("Error creating domain:", err)
-					}
+		for _, domain := range batch {
+			if err := tx.Create(&domain).Error; err != nil {
+				if !strings.Contains(err.Error(), "UNIQUE constraint failed") {
+					log.Println("Error creating domain:", err)
 				}
-				mu.Unlock()
 			}
-		}(batch)
+		}
 	}
-	wg.Wait()
 
 	if err := tx.Commit().Error; err != nil {
 		return err

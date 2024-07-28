@@ -33,7 +33,7 @@ func (s *ScannerService) getWhoIsInfo(tld, domain string) string {
 	return strings.Join(filteredLines, "\n")
 }
 
-func (s *ScannerService) CreateTableIfNotExist(dbName string) (*gorm.DB, error) {
+func (s *ScannerService) createTableIfNotExist(dbName string) (*gorm.DB, error) {
 	db, err := durable.ConnectDB(dbName)
 	if err != nil {
 		return nil, err
@@ -48,8 +48,24 @@ func (s *ScannerService) CreateTableIfNotExist(dbName string) (*gorm.DB, error) 
 	return db, nil
 }
 
+func (s *ScannerService) batchInsertWhoIs(db *gorm.DB, whoisRecords []model.WhoIs) {
+	tx := db.Begin()
+
+	for _, record := range whoisRecords {
+		if err := tx.Create(&record).Error; err != nil {
+			if !strings.Contains(err.Error(), "UNIQUE constraint failed") {
+				fmt.Println("Error creating whois record:", err)
+			}
+		}
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return
+	}
+}
+
 func (s *ScannerService) WhoIs(domains []model.Domain, dbName string) {
-	db, err := s.CreateTableIfNotExist(dbName)
+	db, err := s.createTableIfNotExist(dbName)
 	if err != nil {
 		return
 	}
@@ -79,21 +95,5 @@ func (s *ScannerService) WhoIs(domains []model.Domain, dbName string) {
 
 	if len(whoisRecords) > 0 {
 		s.batchInsertWhoIs(db, whoisRecords)
-	}
-}
-
-func (s *ScannerService) batchInsertWhoIs(db *gorm.DB, whoisRecords []model.WhoIs) {
-	tx := db.Begin()
-
-	for _, record := range whoisRecords {
-		if err := tx.Create(&record).Error; err != nil {
-			if !strings.Contains(err.Error(), "UNIQUE constraint failed") {
-				fmt.Println("Error creating whois record:", err)
-			}
-		}
-	}
-
-	if err := tx.Commit().Error; err != nil {
-		return
 	}
 }
